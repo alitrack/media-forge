@@ -22,10 +22,10 @@ Turn any URL, PDF, or text into a professional podcast or video — **fully offl
 | **Offline** | ❌ Cloud-only | ✅ | ✅ |
 | **License** | Proprietary | Company license required | MIT |
 | **Inputs** | URL/PDF/text | N/A (video SDK) | URL/PDF/text/image/Office |
-| **Outputs** | Audio only | Video (React) | Audio + Video |
+| **Outputs** | Audio + Video | Video (React) | Audio + Video |
 | **TTS** | Google voices | N/A | edge-tts / Azure / CosyVoice |
-| **Video render** | ❌ | React component | Playwright + ffmpeg |
-| **Hermes integration** | ❌ | ❌ | ✅ MCP + Skill |
+| **Video render** | AI-generated overviews | React component | Playwright + ffmpeg |
+| **Programmable** | ❌ Frontend only | ❌ Own SDK | ✅ MCP + CLI + Python API |
 
 MediaForge gives you the podcast-generation power of NotebookLM, the video rendering of Remotion, and the extensibility of a modular pipeline — all as open-source MIT software.
 
@@ -244,7 +244,7 @@ MIT — use it for anything. Commercial, personal, open-source — no restrictio
 ## FAQ
 
 **Q: Does this require a NotebookLM subscription?**
-No. Completely offline — use your own LLM API key for script generation, edge-tts for voice synthesis.
+No. Completely offline — use your own LLM API key for script generation, edge-tts for voice synthesis. NotebookLM's Video Overviews are AI-generated and can't be customized or exported; MediaForge gives you full control over every frame.
 
 **Q: Can I use my own voices?**
 Yes. The Synthesizer supports edge-tts (free), Azure Speech (paid), and CosyVoice 3 (local GPU, open-source).
