@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediaForge × Remotion README</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #0d1117; color: #c9d1d9; font-family: system-ui, sans-serif;
+    max-width: 960px; margin: 0 auto; padding: 40px 20px;
+  }
+  h1 { font-size: 28px; color: #e94560; margin-bottom: 8px; }
+  .sub { color: #8b949e; margin-bottom: 32px; font-size: 14px; }
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 24px; margin-bottom: 24px;
+  }
+  .card h2 { font-size: 18px; margin-bottom: 12px; color: #f5a623; }
+  .card p { font-size: 14px; color: #8b949e; margin-bottom: 16px; }
+  video, audio { width: 100%; border-radius: 4px; outline: none; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 12px; margin-right: 8px;
+  }
+  .badge-video { background: #23863622; color: #3fb950; border: 1px solid #23863644; }
+  .badge-audio { background: #1f6feb22; color: #58a6ff; border: 1px solid #1f6feb44; }
+  .stack { font-size: 12px; color: #484f58; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🎬 MediaForge — Remotion README 播客</h1>
+<div class="sub">
+  从 GitHub README 自动生成双主持访谈 · 纯离线 · 无 NotebookLM 依赖
+</div>
+
+<div class="card">
+  <h2><span class="badge badge-video">MP4</span> 视频版（6帧 + 音频）</h2>
+  <p>Playwright 渲染 HTML 帧 → ffmpeg 合成，1920×1080 H.264</p>
+  <video controls poster="">
+    <source src="remotion_video.mp4" type="video/mp4">
+  </video>
+  <div class="stack">Compose(DeepSeek) → Synthesize(edge-tts: 晓晓+云扬) → Render(Playwright+ffmpeg)</div>
+</div>
+
+<div class="card">
+  <h2><span class="badge badge-audio">MP3</span> 纯音频版</h2>
+  <p>13 段双主持访谈，DeepSeek 生成脚本，edge-tts 合成</p>
+  <audio controls>
+    <source src="remotion_podcast.mp3" type="audio/mpeg">
+  </audio>
+  <div class="stack">652KB · 111s · 晓晓(主持人) + 云扬(专家)</div>
+</div>
+
+</body>
+</html>

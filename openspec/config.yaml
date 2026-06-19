@@ -1,0 +1,19 @@
+schema: spec-driven
+
+context: |
+  MediaForge — 内容到多格式媒体的自动化管线
+  技术栈: Python 3.11+, edge-tts, Playwright, ffmpeg, MCP
+  集成: Hermes Agent via MCP Server + Skill
+  定位: 开源个人项目，不绑定公司
+
+rules:
+  proposal:
+    - Include "Why" section with problem statement
+    - Include "What Changes" with concrete scope
+    - Include "Capabilities" listing new and modified
+    - Include "Impact" listing affected systems and APIs
+    - Must have "Non-goals" section
+  tasks:
+    - Break into chunks of 2-5 focused sessions
+    - Mark existing work with [x]
+    - Each task must complete with testable output
