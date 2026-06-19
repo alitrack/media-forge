@@ -2,15 +2,40 @@
 
 Converts cleaned source text into structured multi-speaker conversation scripts.
 Supports four styles: interview, tutorial, explainer, debate.
+
+Configuration (priority: CLI args > .env file > env vars > defaults):
+  OPENAI_API_KEY       — LLM API key (OpenAI-compatible)
+  OPENAI_BASE_URL      — LLM API base URL (default: https://api.deepseek.com/v1)
+  MEDIAFORGE_MODEL     — Model name (default: deepseek-chat)
 """
 
 import json
 import os
+from pathlib import Path
 from typing import Optional
 
 from mediaforge.types import (
     Script, Segment, ContentStyle, VoiceConfig,
 )
+
+
+def _load_dotenv() -> None:
+    """Load .env from project root (no external dependency)."""
+    env_file = Path(__file__).resolve().parent.parent / ".env"
+    if not env_file.exists():
+        return
+    with open(env_file) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key, val = key.strip(), val.strip().strip("\"'")
+            if key and val and key not in os.environ:
+                os.environ[key] = val
+
+# Auto-load on import
+_load_dotenv()
 
 
 # ── Prompt Templates ──────────────────────────────────────
@@ -107,14 +132,28 @@ class Composer:
 
     def __init__(
         self,
-        model: str = "deepseek-chat",
+        model: str = "",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         max_retries: int = 3,
     ):
-        self.model = model
-        self.api_key = api_key or os.environ.get("ANTHROPIC_AUTH_TOKEN") or os.environ.get("OPENAI_API_KEY")
-        self.base_url = base_url or os.environ.get("ANTHROPIC_BASE_URL") or "https://api.deepseek.com/v1"
+        self.model = (
+            model
+            or os.environ.get("MEDIAFORGE_MODEL")
+            or "deepseek-chat"
+        )
+        # Priority: arg > OPENAI_* env > legacy fallbacks
+        self.api_key = (
+            api_key
+            or os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+        )
+        self.base_url = (
+            base_url
+            or os.environ.get("OPENAI_BASE_URL")
+            or os.environ.get("ANTHROPIC_BASE_URL")
+            or "https://api.deepseek.com/v1"
+        )
         self.max_retries = max_retries
 
     def compose(

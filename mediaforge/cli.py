@@ -102,7 +102,7 @@ def main():
     p.add_argument("--style", default="interview", choices=["interview", "tutorial", "explainer", "debate"])
     p.add_argument("--host-voice", default="xiaoxiao")
     p.add_argument("--expert-voice", default="yunyang")
-    p.add_argument("--model", default="deepseek-chat")
+    p.add_argument("--model", default="")
     p.add_argument("--api-key")
     p.add_argument("--base-url")
     p.add_argument("--tts-backend", default="edge")

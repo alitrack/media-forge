@@ -9,4 +9,4 @@ dist/
 demo/*.mp3
 demo/*.mp4
 /tmp/.mediaforge_frames/
-.DS_Store
+.DS_Store.env
