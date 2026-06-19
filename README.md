@@ -278,3 +278,23 @@ Edit `FRAME_TEMPLATE` in `mediaforge/render.py` — it's just HTML/CSS. Change c
 
 **Q: What LLM providers work?**
 Any OpenAI-compatible API. Tested with DeepSeek, OpenAI, and local Ollama models.
+
+## Cost Note
+
+The MediaForge pipeline itself is MIT-licensed and free. However, the **Compose** stage requires an LLM to generate the dialogue script — that's your cost:
+
+| Stage | Cost |
+|-------|------|
+| Ingest (document parsing) | Free |
+| **Compose (LLM script generation)** | **Your LLM (API or local GPU)** |
+| Synthesize (edge-tts) | Free |
+| Render (Playwright + ffmpeg) | Free |
+| Publish | Free |
+
+Use a local model (Ollama / LlamaCpp) for zero-cost operation, or any OpenAI-compatible API.
+
+## Author
+
+Created by [alitrack](https://github.com/alitrack). Follow on WeChat: **alitrack**（微信搜一搜）
+
+[Demo videos →](https://github.com/alitrack/media-forge/tree/main/output)

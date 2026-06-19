@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediaForge Demo</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d1117; color:#c9d1d9; font-family:system-ui,-apple-system,sans-serif; padding:40px 20px; }
+h1 { text-align:center; color:#58a6ff; margin-bottom:8px; font-size:28px; }
+.sub { text-align:center; color:#8b949e; margin-bottom:40px; font-size:14px; }
+.sub a { color:#58a6ff; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:24px; max-width:1000px; margin:0 auto; }
+.card { background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden; }
+.card h3 { padding:14px 18px; background:#1c2128; border-bottom:1px solid #30363d; font-size:15px; color:#e6edf3; }
+.card video { width:100%; display:block; background:#000; }
+.card .meta { padding:12px 18px; font-size:13px; color:#8b949e; }
+.note { max-width:1000px; margin:24px auto 0; padding:16px 20px; background:#161b22; border:1px solid #30363d; border-radius:8px; font-size:13px; color:#8b949e; }
+.note strong { color:#e6edf3; }
+</style>
+</head>
+<body>
+<h1>🎬 MediaForge Demo</h1>
+<p class="sub">开源管线 · LLM 自理 · <a href="https://github.com/alitrack/media-forge">github.com/alitrack/media-forge</a> · 公众号 alitrack</p>
+<div class="grid">
+  <div class="card">
+    <h3>🎙️ 对话版 — 双主持访谈 (晓晓+云扬)</h3>
+    <video controls src="demo_interview.mp4"></video>
+    <div class="meta">11 段访谈 · 151s · 1920×1080 · 右上角常驻 GitHub + 公众号双码</div>
+  </div>
+  <div class="card">
+    <h3>🎤 解说版 — 单人产品介绍 (晓晓)</h3>
+    <video controls src="demo_intro.mp4"></video>
+    <div class="meta">8 段解说 · 142s · 1920×1080</div>
+  </div>
+</div>
+<div class="note">
+  <strong>管线免费，LLM 自理。</strong> Compose 阶段需 LLM 生成脚本（可本地 Ollama/LlamaCpp 零成本，或 API 按量付费）。其余四层完全免费。
+</div>
+</body>
+</html>
