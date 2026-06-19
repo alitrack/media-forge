@@ -101,3 +101,11 @@ class IngestResult:
     warnings: list[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)  # page_count, language, etc.
 
+
+@dataclass
+class SegmentTiming:
+    """Per-segment timing information for animation rendering."""
+    segment: Segment
+    start: float        # start time in seconds
+    duration: float     # duration in seconds
+

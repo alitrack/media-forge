@@ -40,7 +40,8 @@ def cmd_podcast(args):
 
 
 def cmd_video(args):
-    from mediaforge import Ingester, Composer, Synthesizer, Renderer
+    from mediaforge import Ingester, Composer, Synthesizer
+    from mediaforge.render import get_render_engine
     from mediaforge.types import Source, SourceType, ContentStyle
 
     # Ingest
@@ -66,10 +67,21 @@ def cmd_video(args):
     synth = Synthesizer(backend=args.tts_backend)
     synth.synthesize(script, audio_path)
 
-    # Render
-    renderer = Renderer()
-    video = renderer.render(script, audio_path, args.output, frame_count=args.frames)
-    print(f"Video: {video} ({args.frames} frames, {script.segment_count} segments)")
+    # Render — use engine registry
+    engine_kwargs = {}
+    if args.render == "hyperframes":
+        engine_kwargs["fps"] = args.fps
+    elif args.render == "default":
+        engine_kwargs["frame_count"] = args.frames
+    engine = get_render_engine(args.render, **engine_kwargs)
+    video = engine.render(script, audio_path, args.output)
+
+    info = f"{script.segment_count} segments"
+    if args.render == "hyperframes":
+        info += f", {args.fps}fps"
+    else:
+        info += f", {args.frames} frames"
+    print(f"Video: {video} ({info})")
     return 0
 
 
@@ -115,11 +127,16 @@ def main():
     v.add_argument("--style", default="interview")
     v.add_argument("--host-voice", default="xiaoxiao")
     v.add_argument("--expert-voice", default="yunyang")
-    v.add_argument("--model", default="deepseek-chat")
+    v.add_argument("--model", default="")
     v.add_argument("--api-key")
     v.add_argument("--base-url")
     v.add_argument("--tts-backend", default="edge")
-    v.add_argument("--frames", type=int, default=6)
+    v.add_argument("--render", default="default", choices=["default", "hyperframes"],
+                   help="Render engine: default (static) or hyperframes (animated)")
+    v.add_argument("--fps", type=int, default=30,
+                   help="Frames per second for hyperframes engine (default: 30)")
+    v.add_argument("--frames", type=int, default=6,
+                   help="Number of static frames for default engine (default: 6)")
     v.add_argument("--output", default="/tmp/video.mp4")
 
     # serve

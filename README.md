@@ -50,7 +50,8 @@ pip install mediaforge
 ### 15-Second Demo
 
 ```python
-from mediaforge import Ingester, Composer, Synthesizer, Renderer
+from mediaforge import Ingester, Composer, Synthesizer
+from mediaforge.render import get_render_engine
 from mediaforge.types import Source, SourceType, ContentStyle
 
 # 1. Ingest — URL, PDF, or raw text
@@ -65,9 +66,14 @@ script = composer.compose(result.content, style=ContentStyle.INTERVIEW)
 synth = Synthesizer(backend="edge")
 audio = synth.synthesize(script, "/tmp/podcast.mp3")
 
-# 4. Render — video with visual frames
-renderer = Renderer()
-video = renderer.render(script, audio, "/tmp/video.mp4", frame_count=6)
+# 4. Render — choose your engine
+# Static frames (default):
+engine = get_render_engine("default")
+video = engine.render(script, audio, "/tmp/video.mp4", frame_count=6)
+
+# Animated 30fps (hyperframes):
+engine = get_render_engine("hyperframes", fps=30)
+video = engine.render(script, audio, "/tmp/video.mp4")
 ```
 
 ### CLI
@@ -76,8 +82,11 @@ video = renderer.render(script, audio, "/tmp/video.mp4", frame_count=6)
 # Podcast from URL
 mediaforge podcast --url https://example.com/article
 
-# Video from text
-mediaforge video --text "$(cat notes.md)" --frames 6
+# Video — static frames (default engine)
+mediaforge video --text "$(cat notes.md)" --frames 8
+
+# Video — animated hyperframes (30fps CSS animation)
+mediaforge video --text "$(cat notes.md)" --render hyperframes --fps 30
 
 # Serve generated media
 mediaforge serve /tmp/output/
@@ -143,17 +152,48 @@ synth = Synthesizer(backend="azure", azure_key="...", azure_region="eastus")
 
 ### Stage 4: Render
 
+**Pluggable render engines.** Choose static or animated output.
+
+#### Default Engine (static frames)
+
 HTML frames → Playwright screenshots → ffmpeg video compositing.
 
 ```python
-renderer = Renderer(
-    chromium_path="/usr/bin/chromium",  # auto-detected if omitted
-    width=1920, height=1080, fps=1,
-)
-video = renderer.render(script, audio_path, "output.mp4", frame_count=6)
+from mediaforge.render import get_render_engine
+engine = get_render_engine("default")
+video = engine.render(script, audio, "output.mp4", frame_count=8)
 ```
 
-Customize frame appearance by modifying `FRAME_TEMPLATE` in `mediaforge/render.py`.
+#### Hyperframes Engine (CSS-animated, 30fps)
+
+LLM-generated animated HTML → Playwright per-frame capture → ffmpeg compositing.
+Smooth transitions between dialogue segments with fade-in, slide, and highlight effects.
+
+```python
+engine = get_render_engine("hyperframes", fps=30, width=1920, height=1080)
+video = engine.render(script, audio, "output.mp4")
+```
+
+#### Engine Registry
+
+| Engine | `name` | Output | Best For |
+|--------|--------|--------|----------|
+| `DefaultEngine` | `"default"` | Static frames (30s) | Quick drafts, low CPU |
+| `Hyperframes` | `"hyperframes"` | 30fps animation (90s) | Final publish, demos |
+
+Add custom engines by implementing the `RenderEngine` protocol:
+
+```python
+from mediaforge.render import RenderEngine, register_engine
+
+class MyEngine:
+    name = "my-engine"
+    def render(self, script, audio_path, output_path, **kwargs): ...
+    @classmethod
+    def available(cls): return True
+
+register_engine(MyEngine)
+```
 
 ### Stage 5: Publish
 
