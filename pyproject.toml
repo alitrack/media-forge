@@ -30,6 +30,7 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.scripts]
 mediaforge = "mediaforge.cli:main"
+mediaforge-mcp = "mediaforge.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

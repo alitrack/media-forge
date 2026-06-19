@@ -31,12 +31,20 @@ MediaForge gives you the podcast-generation power of NotebookLM, the video rende
 
 ## Quick Start
 
-### Installation
+### Zero-install (uv)
+
+```bash
+# Generate a podcast — no pip install needed
+uv run --with mediaforge mediaforge podcast --url https://example.com/article
+
+# Or from GitHub directly
+uv run --with git+https://github.com/alitrack/media-forge mediaforge podcast --url https://example.com
+```
+
+### pip install
 
 ```bash
 pip install mediaforge
-# Optional: for video rendering
-pip install playwright && playwright install chromium
 ```
 
 ### 15-Second Demo
@@ -164,7 +172,29 @@ MediaForge ships as both a **standalone tool** and a **Hermes MCP server**:
 
 ### MCP Server (primary integration)
 
-5 tools registered, callable from any Hermes session:
+5 tools registered, callable from any Hermes session.
+
+**Zero-install via uv (recommended):**
+
+```yaml
+# ~/.hermes/config.yaml
+mcp_servers:
+  mediaforge:
+    command: uvx
+    args: ["mediaforge-mcp"]
+```
+
+**Or pip install:**
+
+```bash
+pip install mediaforge
+```
+
+```yaml
+mcp_servers:
+  mediaforge:
+    command: mediaforge-mcp
+```
 
 | Tool | Description |
 |---|---|
@@ -173,15 +203,6 @@ MediaForge ships as both a **standalone tool** and a **Hermes MCP server**:
 | `mediaforge__list_voices` | Available TTS voices |
 | `mediaforge__publish` | Expose file via cloudflared |
 | `mediaforge__serve_dir` | Serve entire directory |
-
-Add to `~/.hermes/config.yaml`:
-
-```yaml
-mcp_servers:
-  mediaforge:
-    command: python
-    args: ["-m", "mcp.server", "--path", "/path/to/media-forge/mcp/server.py"]
-```
 
 ### Skill (UX layer)
 
@@ -193,15 +214,15 @@ The `media-forge` Hermes skill provides trigger words and style guidance:
 
 ## MediaForge as Standalone Agent
 
-The MCP server is self-contained — any MCP-compatible client (Claude Desktop, Cursor, etc.) can use MediaForge tools. No Hermes dependency.
+The MCP server is self-contained — any MCP-compatible client (Claude Desktop, Cursor, etc.) can use MediaForge tools. No Hermes dependency, no pip install:
 
 ```json
 // claude_desktop_config.json
 {
   "mcpServers": {
     "mediaforge": {
-      "command": "python",
-      "args": ["-m", "mcp.server", "--path", "/path/to/media-forge/mcp/server.py"]
+      "command": "uvx",
+      "args": ["mediaforge-mcp"]
     }
   }
 }
