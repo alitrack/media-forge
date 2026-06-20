@@ -15,10 +15,11 @@ class DefaultEngine:
     name = "default"
 
     def __init__(self, **kwargs):
+        self._frame_count = kwargs.pop("frame_count", 6)
         self._renderer = DefaultRenderer(**kwargs)
 
     def render(self, script, audio_path, output_path, **kwargs):
-        frame_count = kwargs.pop("frame_count", 6)
+        frame_count = kwargs.pop("frame_count", self._frame_count)
         return self._renderer.render(
             script, audio_path, output_path, frame_count=frame_count
         )

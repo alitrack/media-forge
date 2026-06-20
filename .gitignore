@@ -11,3 +11,4 @@ demo/*.mp4
 /tmp/.mediaforge_frames/
 .DS_Store.env
 openspec/
+.env
