@@ -155,10 +155,13 @@ Multi-backend TTS with per-segment voice assignment.
 | **edge-tts** | Good | Free | Microsoft (gratis) |
 | **Azure Speech** | Excellent | Paid | Commercial |
 | **CosyVoice 3** | Excellent | Free (local GPU) | Apache 2.0 |
+| **Kokoro-82M** ⓘ | Good (EN) | Free (CPU/GPU) | Apache 2.0 |
 
 ```python
 synth = Synthesizer(backend="azure", azure_key="...", azure_region="eastus")
 ```
+
+> ⓘ Kokoro-82M excels at English content (200× real-time on GPU, 54 voices). Not recommended for mixed Chinese-English text. Integration guide: [wiki/kokoro-tts-backend.md](wiki/kokoro-tts-backend.md)
 
 ### Stage 4: Render
 
