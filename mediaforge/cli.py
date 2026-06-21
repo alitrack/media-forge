@@ -102,6 +102,9 @@ def cmd_video(args):
             engine_kwargs["hooks"] = hooks
         if frame_style:
             engine_kwargs["style"] = frame_style
+    elif args.render == "html-video-templates":
+        engine_kwargs["template"] = args.template
+        engine_kwargs["fps"] = args.fps
     elif args.render == "default":
         engine_kwargs["frame_count"] = args.frames
         if hooks.count() > 0:
@@ -171,8 +174,10 @@ def main():
     v.add_argument("--api-key")
     v.add_argument("--base-url")
     v.add_argument("--tts-backend", default="edge")
-    v.add_argument("--render", default="default", choices=["default", "hyperframes"],
-                   help="Render engine: default (static) or hyperframes (animated)")
+    v.add_argument("--render", default="default", choices=["default", "hyperframes", "html-video-templates"],
+                   help="Render engine: default (static), hyperframes (animated), html-video-templates (GSAP templates)")
+    v.add_argument("--template", default="swiss-grid",
+                   help="Template name for html-video-templates engine (default: swiss-grid)")
     v.add_argument("--fps", type=int, default=30,
                    help="Frames per second for hyperframes engine (default: 30)")
     v.add_argument("--frames", type=int, default=6,
@@ -194,6 +199,9 @@ def main():
     s = sub.add_parser("serve", help="Serve directory via cloudflared")
     s.add_argument("directory")
 
+    # list-templates
+    lt = sub.add_parser("list-templates", help="List available html-video templates")
+
     args = parser.parse_args()
     if args.command == "podcast":
         return cmd_podcast(args)
@@ -201,6 +209,17 @@ def main():
         return cmd_video(args)
     elif args.command == "serve":
         return cmd_serve(args)
+    elif args.command == "list-templates":
+        from mediaforge.render.html_video_templates import HtmlVideoTemplateEngine
+        templates = HtmlVideoTemplateEngine.list_templates()
+        if not templates:
+            print("No templates found. Run: python scripts/offline_html_video_assets.py")
+            return 1
+        print(f"{'Template':<20s}  Description")
+        print("-" * 60)
+        for name, desc in sorted(templates.items()):
+            print(f"  {name:<18s}  {desc}")
+        return 0
     else:
         parser.print_help()
         return 0

@@ -31,6 +31,7 @@ from mediaforge.render.hooks import HookRegistry, RenderContext  # noqa: F401
 # Auto-register engines
 from mediaforge.render import _default  # noqa: F401 — registers "default"
 from mediaforge.render import hyperframes  # noqa: F401 — registers "hyperframes"
+from mediaforge.render import html_video_templates  # noqa: F401 — registers "html-video-templates"
 
 __all__ = [
     "RenderEngine",

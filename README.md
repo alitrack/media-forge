@@ -230,6 +230,36 @@ save_session(state, "demo.mediaforge")
 |--------|--------|--------|----------|
 | `DefaultEngine` | `"default"` | Static frames (30s) | Quick drafts, low CPU |
 | `Hyperframes` | `"hyperframes"` | 30fps animation (90s) | Final publish, demos |
+| `HtmlVideoTemplateEngine` | `"html-video-templates"` | GSAP template animation | Professional visuals, 23 templates |
+
+#### Html-Video Templates Engine (GSAP, 3rd-party templates)
+
+Render scripts using professional HTML/CSS/GSAP templates from the open-source
+[html-video](https://github.com/nexu-io/html-video) project (Apache-2.0, 3.4k⭐).
+
+```python
+from mediaforge.render import get_render_engine
+
+# Swiss grid layout — clean typography
+engine = get_render_engine("html-video-templates", template="swiss-grid")
+video = engine.render(script, audio, "output.mp4")
+
+# Or kinetic-type for punchy text animations
+engine = get_render_engine("html-video-templates", template="kinetic-type")
+video = engine.render(script, audio, "output.mp4")
+```
+
+```bash
+# CLI
+mediaforge video --text "$(cat notes.md)" \
+    --render html-video-templates \
+    --template warm-grain
+
+# List available templates
+mediaforge list-templates
+```
+
+First run downloads GSAP and fonts offline (no CDN dependency):
 
 #### Rendering Quality
 
@@ -356,6 +386,7 @@ media-forge/
 │   └── render/          # Pluggable render engines
 │       ├── base.py          # RenderEngine Protocol + registry
 │       ├── hyperframes.py   # Hyperframes engine (CSS animation)
+│       ├── html_video_templates.py  # html-video GSAP template engine (NEW)
 │       ├── hooks.py         # 4-stage render hook pipeline
 │       ├── builtin_hooks.py # Watermark, progress bar, QR code hooks
 │       ├── export.py        # ExportEngine (FFmpeg + WebCodecs)
