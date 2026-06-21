@@ -161,7 +161,7 @@ Multi-backend TTS with per-segment voice assignment.
 synth = Synthesizer(backend="azure", azure_key="...", azure_region="eastus")
 ```
 
-> ⓘ Kokoro-82M excels at English content (200× real-time on GPU, 54 voices). Not recommended for mixed Chinese-English text. Integration guide: [wiki/kokoro-tts-backend.md](wiki/kokoro-tts-backend.md)
+> ⓘ Kokoro-82M excels at English content (200× real-time on GPU, 54 voices). Not recommended for mixed Chinese-English text. Integration guide: [docs/kokoro-tts-backend.md](docs/kokoro-tts-backend.md)
 
 ### Stage 4: Render
 
