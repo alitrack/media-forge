@@ -120,6 +120,11 @@ async def generate_video(
     frame_count: int = 4,
     audio_path: str = "/tmp/podcast.mp3",
     video_path: str = "/tmp/video.mp4",
+    render: str = "default",
+    fps: int = 30,
+    watermark_text: str = "",
+    qrcode_url: str = "",
+    progress_bar: bool = False,
 ) -> str:
     """Generate a video with visual frames from text or URL.
 
@@ -129,14 +134,22 @@ async def generate_video(
         style: 'interview', 'tutorial', 'explainer', or 'debate'.
         host_voice: Voice for host.
         expert_voice: Voice for expert.
-        frame_count: Number of visual frames (2-8).
+        frame_count: Number of visual frames (2-8, default engine only).
         audio_path: Intermediate audio file path.
         video_path: Output MP4 path.
+        render: Render engine — 'default' (static) or 'hyperframes' (animated, 30fps).
+        fps: Frames per second for hyperframes engine (default: 30).
+        watermark_text: Watermark text overlay (hyperframes only).
+        qrcode_url: QR code URL to overlay on frames (hyperframes only).
+        progress_bar: Show animated progress bar (hyperframes only).
 
     Returns:
         Path to generated MP4.
     """
-    from mediaforge import Ingester, Synthesizer, Renderer
+    from mediaforge import Ingester, Synthesizer
+    from mediaforge.render import get_render_engine
+    from mediaforge.render.hooks import HookRegistry
+    from mediaforge.render.builtin_hooks import watermark_hook, progress_bar_hook, qrcode_hook
     from mediaforge.types import Source, SourceType, ContentStyle
 
     # 1. Ingest
@@ -167,12 +180,35 @@ async def generate_video(
     synth = Synthesizer(backend="edge")
     synth.synthesize(script, audio_path)
 
-    # 4. Render video
-    renderer = Renderer()
-    renderer.render(script, audio_path, video_path, frame_count=frame_count)
+    # 4. Build hooks
+    hooks = HookRegistry()
+    if watermark_text.strip():
+        hooks.register("post-frame", watermark_hook(watermark_text))
+    if progress_bar:
+        hooks.register("post-frame", progress_bar_hook())
+    if qrcode_url.strip():
+        hooks.register("pre-ffmpeg", qrcode_hook(qrcode_url))
+
+    # 5. Render video
+    engine_kwargs = {}
+    if render == "hyperframes":
+        engine_kwargs["fps"] = fps
+        if hooks.count() > 0:
+            engine_kwargs["hooks"] = hooks
+    elif render == "default":
+        engine_kwargs["frame_count"] = frame_count
+
+    engine = get_render_engine(render, **engine_kwargs)
+    engine.render(script, audio_path, video_path)
     sz = os.path.getsize(video_path)
 
-    return f"Video saved: {video_path} ({sz//1024}KB, {frame_count} frames, {len(script.segments)} segments)"
+    info = f"{sz//1024}KB, {len(script.segments)} segments"
+    if render == "hyperframes":
+        info += f", {fps}fps"
+    else:
+        info += f", {frame_count} frames"
+
+    return f"Video saved: {video_path} ({info})"
 
 
 @mcp.tool()

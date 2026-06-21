@@ -15,10 +15,14 @@ import glob
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 from typing import ClassVar
 
-from mediaforge.types import Script, Segment, SegmentTiming
+from mediaforge.types import Script, Segment, SegmentTiming, FrameStyle, STYLE_PRESETS, ASPECT_RATIOS
 from mediaforge.render.base import RenderError, register_engine
+from mediaforge.render.hooks import HookRegistry, RenderContext
+from mediaforge.render.export import ExportEngine, get_export_engine
+from mediaforge.render.styling import build_style_html
 
 
 # ── Animation HTML Template ───────────────────────────────
@@ -32,8 +36,11 @@ ANIMATION_TEMPLATE = """<!DOCTYPE html>
   body {{
     width: {width}px; height: {height}px;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    color: #e0e0e0;
-    font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    color: #ffffff;
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     overflow: hidden;
     position: relative;
   }}
@@ -41,7 +48,8 @@ ANIMATION_TEMPLATE = """<!DOCTYPE html>
     background: linear-gradient(180deg, #e94560, #f5a623); }}
   .title-bar {{
     position: absolute; top: 40px; left: 80px; right: 80px;
-    font-size: 24px; color: #f5a623; opacity: 0.6;
+    font-size: 28px; color: #f5a623; opacity: 0.7;
+    font-weight: 600; letter-spacing: 0.5px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }}
   .progress {{
@@ -69,20 +77,24 @@ ANIMATION_TEMPLATE = """<!DOCTYPE html>
   .seg {{
     position: absolute; width: 100%;
     opacity: 0; transform: translateY(24px);
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 0.35s ease-out, transform 0.35s ease-out;
     pointer-events: none;
   }}
   .seg.active {{
     opacity: 1; transform: translateY(0); pointer-events: auto;
   }}
   .seg.past {{
-    opacity: 0.3; transform: translateY(-12px);
+    opacity: 0; transform: translateY(-12px);
+    transition: opacity 0.2s ease-in, transform 0.2s ease-in;
   }}
   .speaker {{
-    font-size: 22px; margin-bottom: 20px; opacity: 0.85;
+    font-size: 30px; margin-bottom: 24px; opacity: 0.9;
+    font-weight: 600; letter-spacing: 0.3px;
   }}
   .text {{
-    font-size: 36px; line-height: 1.6; max-width: 90%;
+    font-size: 48px; line-height: 1.5; max-width: 85%;
+    font-weight: 500; letter-spacing: 0.3px;
+    -webkit-font-smoothing: antialiased;
   }}
   .text .highlight {{
     color: #e94560; font-weight: 700;
@@ -171,11 +183,32 @@ class Hyperframes:
         width: int = 1920,
         height: int = 1080,
         chromium_path: str | None = None,
+        hooks: HookRegistry | None = None,
+        export_engine: ExportEngine | str = "ffmpeg",
+        style: FrameStyle | str | None = None,
     ):
         self.fps = max(15, min(60, fps))
-        self.width = width
-        self.height = height
+
+        # Resolve style (name or object) → apply dimensions if aspect_ratio set
+        if isinstance(style, str):
+            self.style = STYLE_PRESETS.get(style, STYLE_PRESETS.get("dark", FrameStyle()))
+        elif style is not None:
+            self.style = style
+        else:
+            self.style = STYLE_PRESETS["dark"]
+
+        # Override width/height from style aspect_ratio
+        ar_dims = ASPECT_RATIOS.get(self.style.aspect_ratio, (width, height))
+        self.width = ar_dims[0]
+        self.height = ar_dims[1]
+
         self.chromium_path = chromium_path or self._find_chromium()
+        self.hooks = hooks or HookRegistry()
+        self.export_engine = (
+            get_export_engine(export_engine)
+            if isinstance(export_engine, str)
+            else export_engine
+        )
 
     @staticmethod
     def _find_chromium() -> str:
@@ -211,24 +244,68 @@ class Hyperframes:
         if not script.segments:
             raise RenderError("Script has no segments")
 
+        on_progress = kwargs.get("on_progress")
+
         # 1. Timing estimation
         audio_duration = self._get_audio_duration(audio_path)
         timings = self._estimate_timing(script.segments, audio_duration)
 
+        total_frames = int(audio_duration * self.fps)
+
+        # Build shared render context for hooks
+        ctx = RenderContext(
+            audio_path=audio_path,
+            output_path=output_path,
+            fps=self.fps,
+            width=self.width,
+            height=self.height,
+            frame_count=total_frames,
+        )
+
+        # Stage: pre-frame (modify metadata before HTML gen)
+        self.hooks.run_stage("pre-frame", ctx)
+
         # 2. Build animation HTML
-        html = self._build_animation_html(script, timings)
+        ctx.html_content = self._build_animation_html(script, timings)
+
+        # Stage: post-frame (inject CSS/JS into HTML)
+        self.hooks.run_stage("post-frame", ctx)
 
         # 3. Capture frames
-        total_frames = int(audio_duration * self.fps)
         work_dir = tempfile.mkdtemp(prefix="mediaforge_hyperframes_")
-        frames = self._capture_frames(html, total_frames, work_dir)
+        frames = self._capture_frames(
+            ctx.html_content, total_frames, work_dir, on_progress=on_progress
+        )
+        ctx.frames_dir = Path(work_dir) / "frames"
 
-        # 4. Frames → silent video
-        silent_mp4 = os.path.join(work_dir, "silent.mp4")
-        self._frames_to_video(frames, silent_mp4)
+        # Stage: pre-ffmpeg (modify frame images before assembly)
+        self.hooks.run_stage("pre-ffmpeg", ctx)
 
-        # 5. Mux audio
-        self._mux_audio(silent_mp4, audio_path, output_path)
+        # Report ffmpeg progress
+        if on_progress:
+            try:
+                on_progress("ffmpeg", 0, 1, "Assembling video with ffmpeg...")
+            except Exception:
+                pass
+
+        # 4. Export via engine (frames → video + audio mux)
+        self.export_engine.export(
+            frames_dir=str(ctx.frames_dir),
+            audio_path=audio_path,
+            output_path=output_path,
+            fps=self.fps,
+            width=self.width,
+            height=self.height,
+        )
+
+        if on_progress:
+            try:
+                on_progress("ffmpeg", 1, 1, "Export complete")
+            except Exception:
+                pass
+
+        # Stage: post-output (after final output file written)
+        self.hooks.run_stage("post-output", ctx)
 
         return output_path
 
@@ -281,7 +358,10 @@ class Hyperframes:
             for t in timings
         ])
 
-        return ANIMATION_TEMPLATE.format(
+        # Build style CSS for injection
+        style_css = build_style_html(self.style)
+
+        html = ANIMATION_TEMPLATE.format(
             width=self.width,
             height=self.height,
             title=script.title or "MediaForge",
@@ -291,6 +371,18 @@ class Hyperframes:
             segment_data=seg_data,
             total_duration=total_duration,
         )
+
+        # Inject style CSS into the <style> block
+        html = html.replace(
+            "</style>",
+            f"\n/* FrameStyle CSS variables */\n{style_css}\n</style>",
+            1,
+        )
+
+        # Add mf-styled class to body
+        html = html.replace("<body>", '<body class="mf-styled">', 1)
+
+        return html
 
     @staticmethod
     def _highlight_text(text: str) -> str:
@@ -304,7 +396,7 @@ class Hyperframes:
     # ── Step 3: Frame Capture ───────────────────────────
 
     def _capture_frames(
-        self, html: str, total_frames: int, work_dir: str
+        self, html: str, total_frames: int, work_dir: str, on_progress=None
     ) -> list[str]:
         """Capture each frame via Playwright at specified FPS."""
         try:
@@ -322,6 +414,7 @@ class Hyperframes:
 
         frame_paths = []
         frame_interval = max(0.016, 1.0 / self.fps)  # min 16ms
+        progress_interval = max(1, total_frames // 10)  # report every 10%
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -344,6 +437,25 @@ class Hyperframes:
                     png_path = os.path.join(frames_dir, f"frame_{i:06d}.png")
                     page.screenshot(path=png_path, full_page=False)
                     frame_paths.append(png_path)
+
+                    # Progress report every 10% of frames
+                    if on_progress and i % progress_interval == 0:
+                        try:
+                            on_progress(
+                                "capture", i + 1, total_frames,
+                                f"Capturing frame {i+1}/{total_frames}"
+                            )
+                        except Exception:
+                            pass
+
+                if on_progress:
+                    try:
+                        on_progress(
+                            "capture", total_frames, total_frames,
+                            f"Capture complete: {total_frames} frames"
+                        )
+                    except Exception:
+                        pass
             finally:
                 browser.close()
 

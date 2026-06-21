@@ -85,8 +85,18 @@ mediaforge podcast --url https://example.com/article
 # Video — static frames (default engine)
 mediaforge video --text "$(cat notes.md)" --frames 8
 
-# Video — animated hyperframes (30fps CSS animation)
-mediaforge video --text "$(cat notes.md)" --render hyperframes --fps 30
+# Video — animated hyperframes with hooks
+mediaforge video --text "$(cat notes.md)" \
+    --render hyperframes --fps 30 \
+    --frame-style gradient \
+    --watermark "MediaForge" \
+    --progress-bar
+
+# Video — vertical shorts (9:16)
+mediaforge video --text "$(cat notes.md)" \
+    --render hyperframes \
+    --output-preset 9:16 \
+    --frame-style clean
 
 # Serve generated media
 mediaforge serve /tmp/output/
@@ -169,9 +179,46 @@ video = engine.render(script, audio, "output.mp4", frame_count=8)
 LLM-generated animated HTML → Playwright per-frame capture → ffmpeg compositing.
 Smooth transitions between dialogue segments with fade-in, slide, and highlight effects.
 
+**New in v2: Render hooks, frame styling, export engine selection.**
+
 ```python
-engine = get_render_engine("hyperframes", fps=30, width=1920, height=1080)
+from mediaforge.render import get_render_engine
+from mediaforge.render.hooks import HookRegistry
+from mediaforge.render.builtin_hooks import watermark_hook, progress_bar_hook
+
+# Build hooks
+hooks = HookRegistry()
+hooks.register("post-frame", watermark_hook("MediaForge"))
+hooks.register("post-frame", progress_bar_hook())
+
+# Animated 30fps with watermark + progress bar + gradient style
+engine = get_render_engine(
+    "hyperframes",
+    fps=30,
+    hooks=hooks,
+    style="gradient",        # clean | dark | gradient
+    export_engine="ffmpeg",  # ffmpeg | webcodecs
+)
 video = engine.render(script, audio, "output.mp4")
+```
+
+**Render hooks** inject effects at 4 pipeline stages:
+`pre-frame` → `post-frame` (modify HTML) → `pre-ffmpeg` (overlay images) → `post-output`
+
+Built-in hooks: `watermark_hook()`, `progress_bar_hook()`, `qrcode_hook()`.
+
+**Frame styles** (inspired by Recordly) via `style=` parameter:
+`clean`, `dark`, `gradient` — or pass a `FrameStyle` object with custom gradients, shadows, rounded corners, and aspect ratios (16:9/1:1/9:16/4:3).
+
+**Export engines**: `ffmpeg` (stable, default) or `webcodecs` (fast preview via Chromium WebCodecs).
+
+**Session files**: Save pipeline state as `.mediaforge` YAML — resume from any stage.
+
+```python
+from mediaforge.session import save_session, load_session
+
+state = PipelineState(stage="synthesized", script={...})
+save_session(state, "demo.mediaforge")
 ```
 
 #### Engine Registry
@@ -180,6 +227,20 @@ video = engine.render(script, audio, "output.mp4")
 |--------|--------|--------|----------|
 | `DefaultEngine` | `"default"` | Static frames (30s) | Quick drafts, low CPU |
 | `Hyperframes` | `"hyperframes"` | 30fps animation (90s) | Final publish, demos |
+
+#### Rendering Quality
+
+For crisp, ghost-free text in hyperframes output, the engine applies these optimizations by default:
+
+| Fix | Detail |
+|-----|--------|
+| Font size | 48px body text on 1920×1080 canvas |
+| Font smoothing | `-webkit-font-smoothing: antialiased` + `text-rendering: optimizeLegibility` |
+| Text contrast | Pure white (`#ffffff`) on dark gradient background |
+| Segment transitions | `opacity` + `transform` only (no `all`), past segments fully hidden (opacity 0) |
+| Encoding | FFmpeg `-preset medium -crf 18` preserves text detail |
+
+If you encounter blurry text or ghosting, check: nested `<style>` tags, font size below 48px, missing font smoothing, low contrast text colors, or aggressive encoding presets (`-preset fast -crf 23`).
 
 Add custom engines by implementing the `RenderEngine` protocol:
 
@@ -283,12 +344,20 @@ pytest
 media-forge/
 ├── mediaforge/          # Core pipeline package
 │   ├── __init__.py      # Public API surface
-│   ├── types.py         # Source, Script, Segment, ContentStyle
+│   ├── types.py         # Source, Script, FrameStyle, ContentStyle
 │   ├── ingest.py        # Plugin-based content extraction
 │   ├── compose.py       # LLM script generation (4 styles)
 │   ├── synthesize.py    # TTS backends (edge/Azure/CosyVoice)
-│   ├── render.py        # HTML frames → Playwright → ffmpeg
-│   └── publish.py       # cloudflared tunnel serving
+│   ├── session.py       # .mediaforge session files (save/resume)
+│   ├── publish.py       # cloudflared tunnel serving
+│   └── render/          # Pluggable render engines
+│       ├── base.py          # RenderEngine Protocol + registry
+│       ├── hyperframes.py   # Hyperframes engine (CSS animation)
+│       ├── hooks.py         # 4-stage render hook pipeline
+│       ├── builtin_hooks.py # Watermark, progress bar, QR code hooks
+│       ├── export.py        # ExportEngine (FFmpeg + WebCodecs)
+│       ├── styling.py       # FrameStyle CSS generator + squircle
+│       └── _default_impl.py # Default static-frame engine
 ├── mcp/
 │   └── server.py        # Hermes MCP server (5 tools)
 ├── demo/

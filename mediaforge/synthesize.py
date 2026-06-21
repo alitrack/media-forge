@@ -46,13 +46,15 @@ class Synthesizer:
         self.backend = backend
         self.proxy = proxy or _default_proxy()
 
-    def synthesize(self, script: Script, output_path: str) -> str:
+    def synthesize(self, script: Script, output_path: str, on_progress=None) -> str:
         """Generate MP3 from script. Returns output_path."""
         if not script.segments:
             raise SynthesizeError("Script has no segments")
 
         # Generate each segment as MP3
-        segment_files = asyncio.run(self._generate_segments(script.segments, output_path))
+        segment_files = asyncio.run(
+            self._generate_segments(script.segments, output_path, on_progress)
+        )
 
         # Concatenate
         if len(segment_files) == 1:
@@ -72,11 +74,12 @@ class Synthesizer:
         return output_path
 
     async def _generate_segments(
-        self, segments: list[Segment], output_path: str
+        self, segments: list[Segment], output_path: str, on_progress=None
     ) -> list[str]:
         """Generate MP3 for each segment in parallel batches."""
         out_dir = os.path.dirname(output_path) or "."
         files = []
+        total = len(segments)
 
         # Generate sequentially to respect rate limits
         for i, seg in enumerate(segments):
@@ -84,6 +87,12 @@ class Synthesizer:
             segment_path = os.path.join(out_dir, f".seg_{i:03d}.mp3")
             await self._speak(seg.text, voice_id, segment_path)
             files.append(segment_path)
+            if on_progress:
+                try:
+                    on_progress("tts", i + 1, total,
+                               f"Generating voice {i+1}/{total}")
+                except Exception:
+                    pass  # don't let progress callback break generation
 
         return files
 

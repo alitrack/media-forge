@@ -22,6 +22,12 @@ from mediaforge.render.base import (
 # Backward-compat: Renderer alias
 from mediaforge.render._default_impl import DefaultRenderer as Renderer  # noqa: F401
 
+# Export engine
+from mediaforge.render.export import get_export_engine, list_export_engines  # noqa: F401
+
+# Hooks
+from mediaforge.render.hooks import HookRegistry, RenderContext  # noqa: F401
+
 # Auto-register engines
 from mediaforge.render import _default  # noqa: F401 — registers "default"
 from mediaforge.render import hyperframes  # noqa: F401 — registers "hyperframes"
@@ -33,4 +39,8 @@ __all__ = [
     "get_render_engine",
     "list_engines",
     "register_engine",
+    "get_export_engine",
+    "list_export_engines",
+    "HookRegistry",
+    "RenderContext",
 ]
