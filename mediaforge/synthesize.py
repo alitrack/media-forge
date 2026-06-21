@@ -1,7 +1,8 @@
 """Audio synthesis layer — TTS per segment + ffmpeg concatenation.
 
-Supports multiple backends via VoiceCast abstraction.
+Supports multiple backends via backend dispatch.
 Default: edge-tts (free, no registration).
+Azure: commercial-quality TTS with SSML support.
 """
 
 import asyncio
@@ -29,7 +30,19 @@ VOICE_REGISTRY: dict[str, dict[str, str]] = {
         "xiaoxiao_multilingual": "zh-CN-XiaoxiaoMultilingualNeural",
         "yunyang_multilingual": "zh-CN-YunyangMultilingualNeural",
     },
-    # Future: azure, cosyvoice
+    "azure": {
+        "xiaoxiao": "zh-CN-XiaoxiaoNeural",
+        "yunyang": "zh-CN-YunyangNeural",
+        "xiaoxiao_multilingual": "zh-CN-XiaoxiaoMultilingualNeural",
+        "yunxi": "zh-CN-YunxiNeural",
+        "xiaoyi": "zh-CN-XiaoyiNeural",
+        "yunjian": "zh-CN-YunjianNeural",
+        # English voices
+        "aria": "en-US-AriaNeural",
+        "jenny": "en-US-JennyNeural",
+        "guy": "en-US-GuyNeural",
+    },
+    # Future: cosyvoice
 }
 
 
@@ -42,9 +55,18 @@ class Synthesizer:
         self,
         backend: str = "edge",
         proxy: Optional[str] = None,
+        azure_speech_key: Optional[str] = None,
+        azure_speech_region: Optional[str] = None,
     ):
         self.backend = backend
         self.proxy = proxy or _default_proxy()
+        # Azure credentials: constructor arg > env var
+        self.azure_speech_key = azure_speech_key or os.environ.get(
+            "AZURE_SPEECH_KEY", ""
+        )
+        self.azure_speech_region = azure_speech_region or os.environ.get(
+            "AZURE_SPEECH_REGION", ""
+        )
 
     def synthesize(self, script: Script, output_path: str, on_progress=None) -> str:
         """Generate MP3 from script. Returns output_path."""
@@ -100,8 +122,77 @@ class Synthesizer:
         """Generate audio for a single text segment."""
         if self.backend == "edge":
             await self._speak_edge(text, voice, output_path)
+        elif self.backend == "azure":
+            await self._speak_azure(text, voice, output_path)
         else:
             raise SynthesizeError(f"Unknown backend: {self.backend}")
+
+    async def _speak_azure(self, text: str, voice: str, output_path: str) -> None:
+        """Azure Cognitive Services TTS with SSML + retry."""
+        if not self.azure_speech_key or not self.azure_speech_region:
+            raise SynthesizeError(
+                "Azure TTS requires AZURE_SPEECH_KEY and "
+                "AZURE_SPEECH_REGION environment variables"
+            )
+
+        try:
+            import azure.cognitiveservices.speech as speechsdk  # noqa: E402
+        except ImportError:
+            raise SynthesizeError(
+                "Azure TTS requires azure-cognitiveservices-speech. "
+                "Install: pip install azure-cognitiveservices-speech"
+            )
+
+        speech_config = speechsdk.SpeechConfig(
+            subscription=self.azure_speech_key,
+            region=self.azure_speech_region,
+        )
+        speech_config.speech_synthesis_voice_name = voice
+        # Apply proxy if configured
+        if self.proxy:
+            speech_config.set_proxy(self.proxy, None, None)
+
+        # Use SSML for better quality control
+        ssml = (
+            f'<speak version="1.0" '
+            f'xmlns="http://www.w3.org/2001/10/synthesis" '
+            f'xml:lang="zh-CN">'
+            f'<voice name="{voice}">{_escape_xml(text)}</voice>'
+            f"</speak>"
+        )
+
+        synthesizer = speechsdk.SpeechSynthesizer(
+            speech_config=speech_config, audio_config=None
+        )
+
+        last_error = None
+        for attempt in range(3):
+            try:
+                result = synthesizer.speak_ssml_async(ssml).get()
+                if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+                    with open(output_path, "wb") as f:
+                        f.write(result.audio_data)
+                    if os.path.getsize(output_path) > 0:
+                        return
+                    raise SynthesizeError("Azure produced zero-byte audio")
+                elif result.reason == speechsdk.ResultReason.Canceled:
+                    cancellation = result.cancellation_details
+                    raise SynthesizeError(
+                        f"Azure TTS canceled: "
+                        f"{cancellation.cancellation_reason} — "
+                        f"{cancellation.error_details}"
+                    )
+                else:
+                    raise SynthesizeError(
+                        f"Azure TTS unexpected result: {result.reason}"
+                    )
+            except Exception as e:
+                last_error = e
+                if attempt < 2:
+                    await asyncio.sleep(2**attempt)
+                # Retry on next iteration
+
+        raise SynthesizeError(f"Azure TTS failed after 3 attempts: {last_error}")
 
     async def _speak_edge(self, text: str, voice: str, output_path: str) -> None:
         """edge-tts: retry 3x with exponential backoff."""
@@ -158,6 +249,17 @@ class Synthesizer:
 
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             raise SynthesizeError("ffmpeg produced empty output")
+
+
+def _escape_xml(text: str) -> str:
+    """Escape special XML characters for SSML safety."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
 
 
 def _default_proxy() -> Optional[str]:
